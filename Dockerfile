@@ -57,7 +57,7 @@ RUN wget http://www.rfxn.com/downloads/maldetect-current.tar.gz && \
 COPY . /app
 
 # Set NVD API key environment variable
-ENV NVD_API_KEY=9062fe8d-f48f-4fc3-8781-787f49b014d8
+ENV NVD_API_KEY=3e51919f-b667-4af0-a916-b42d4d438d2e
 
 # Copy the dependency-check.properties file
 COPY dependency-check.properties /app/
