@@ -1,8 +1,9 @@
-# handlers.py
+#handlers
 
 import os
 import click
 import re
+import subprocess
 
 from formatter import append_to_report, format_gitleaks_findings
 from scanners import (
@@ -17,7 +18,37 @@ ansi_escape_pattern = re.compile(r'\x1B[@-_][0-?]*[ -/]*[@-~]')
 def remove_ansi_codes(text):
     return ansi_escape_pattern.sub('', text)
 
-def handle_scan(image, scan_type, output):
+def login_to_registry(username, password, registry):
+    """Log in to the Docker registry if username and password are provided."""
+    if username and password:
+        login_command = ['docker', 'login']
+        if registry:
+            login_command.append(registry)
+        login_command += ['--username', username, '--password-stdin']
+        process = subprocess.Popen(login_command, stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        stdout, stderr = process.communicate(input=password)
+        if process.returncode != 0:
+            click.echo(f"Error logging into {registry if registry else 'DockerHub'}: {stderr}")
+            return False
+        click.echo(f"Successfully logged into {registry if registry else 'DockerHub'}")
+    return True
+
+def handle_scan(image, scan_type, output, username, password, registry):
+    if username and password:
+        if not login_to_registry(username, password, registry):
+            return
+    
+    # Pull the Docker image if it does not exist locally
+    click.echo(f"Pulling image {image} if it does not exist locally...")
+    pull_command = ['docker', 'pull', image]
+    pull_process = subprocess.run(pull_command, capture_output=True, text=True)
+    if pull_process.returncode != 0:
+        click.echo(f"Error pulling image {image}: {pull_process.stderr}")
+        return
+    else:
+        click.echo("No credentials provided. Skipping image pull and continuing with local resources.")
+
+
     report_contents = ""
 
     if image:
@@ -55,7 +86,6 @@ def handle_scan(image, scan_type, output):
             if dockle_output:
                 click.echo(f"Dockle Dependency Scan Output:\n{dockle_output}")
                 report_contents = append_to_report(report_contents, dockle_output, 'Dockle Dependency')
-            
 
         if 'secrets' in scan_type:
             click.echo('Running Gitleaks and truffleHog for secrets...')
@@ -81,13 +111,12 @@ def handle_scan(image, scan_type, output):
 
         clean_up(tar_file, extract_dir)
 
-# Apply ANSI code removal just before writing to file
-    final_report = remove_ansi_codes(report_contents)
+    # Apply ANSI code removal just before writing to file
+    if output:
+        final_report = remove_ansi_codes(report_contents)
 
-    with open(output, 'w') as report_file:
-        report_file.write(final_report)
+        with open(output, 'w') as report_file:
+            report_file.write(final_report)
 
-    click.echo(f"Scan results written to {output}")
+        click.echo(f"Scan results written to {output}")
     click.echo(report_contents)
-
-

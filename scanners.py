@@ -112,7 +112,8 @@ def run_dependency_check(scan_dir):
         '--propertyfile', '/app/dependency-check.properties',
         '--prettyPrint',
         '--out', report_directory,
-        '--log', log_file
+        '--log', log_file,
+        '--disableCentralCache'
     ]
 
     click.echo(f"Running Dependency-Check with command: {' '.join(command)}")
